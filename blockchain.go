@@ -8,11 +8,13 @@ import (
 	"time"
 )
 
+const MINING_DIFICULTY = 3
+
 //blockを定義
 type Block struct {
+	timestamp    int64
 	nonce        int
 	previousHash [32]byte
-	timestamp    int64
 	//スライス型
 	transactions []*Transaction
 }
@@ -97,6 +99,38 @@ func (bc *Blockchain) AddTransaction(sender string, recipient string, value floa
 	bc.transactionPool = append(bc.transactionPool, t)
 }
 
+//新規でトランザクションを作成し、追加する
+func (bc *Blockchain) CopyTransactionPool() []*Transaction {
+	transactions := make([]*Transaction, 0)
+	transactions = append(transactions)
+	for _, t := range bc.transactionPool {
+		transactions = append(transactions, NewTransaction(t.senderBlockchainAddress, t.recipientBlockchainAddress, t.value))
+	}
+	return transactions
+}
+
+//proofOfWorkが有効かを判断
+func (bc *Blockchain) ValidProof(nonce int, previousHash [32]byte, transactions []*Transaction, difficulty int) bool {
+	zeros := strings.Repeat("0", difficulty)
+	guessBlock := Block{
+		0, nonce, previousHash, transactions,
+	}
+	guessHashStr := fmt.Sprintf("%x", guessBlock.Hash())
+	fmt.Println(guessHashStr)
+	return guessHashStr[:difficulty] == zeros
+}
+
+//ProofOfWorkでnonceを求める
+func (bc *Blockchain) ProofOfWork() int {
+	transactions := bc.CopyTransactionPool()
+	previousHash := bc.LastBlock().Hash()
+	nonce := 0
+	for !bc.ValidProof(nonce, previousHash, transactions, MINING_DIFICULTY) {
+		nonce += 1
+	}
+	return nonce
+}
+
 //Transactionを定義
 type Transaction struct {
 	senderBlockchainAddress    string
@@ -134,13 +168,15 @@ func main() {
 
 	//chainの最後にハッシュを追加するために、ハッシュを生成する
 	previousHash := blockchain.LastBlock().Hash()
-	blockchain.CreateBlock(5, previousHash)
+	nonce := blockchain.ProofOfWork()
+	blockchain.CreateBlock(nonce, previousHash)
 	blockchain.Print()
 
 	blockchain.AddTransaction("C", "D", 2.0)
 	blockchain.AddTransaction("X", "Y", 3.0)
 
 	previousHash = blockchain.LastBlock().Hash()
+	nonce = blockchain.ProofOfWork()
 	blockchain.CreateBlock(2, previousHash)
 	blockchain.Print()
 }
