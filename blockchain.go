@@ -4,11 +4,16 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
 
-const MINING_DIFICULTY = 3
+const (
+	MINING_DIFICULTY = 3
+	MINING_SENDER    = "THE BLOCKCHAIN"
+	MINING_REWARD    = 1.0
+)
 
 //blockを定義
 type Block struct {
@@ -59,14 +64,16 @@ func (b *Block) MarshalJSON() ([]byte, error) {
 }
 
 type Blockchain struct {
-	transactionPool []*Transaction
-	chain           []*Block
+	transactionPool   []*Transaction
+	chain             []*Block
+	blockchainAddress string
 }
 
 //blockchainを生成し、初期値をいれる
-func NewBlockchain() *Blockchain {
+func NewBlockchain(blockchainAddress string) *Blockchain {
 	b := &Block{}
 	bc := new(Blockchain)
+	bc.blockchainAddress = blockchainAddress
 	bc.CreateBlock(0, b.Hash())
 	return bc
 }
@@ -131,6 +138,16 @@ func (bc *Blockchain) ProofOfWork() int {
 	return nonce
 }
 
+func (bc *Blockchain) Mining() bool {
+	bc.AddTransaction(MINING_SENDER, bc.blockchainAddress, MINING_DIFICULTY)
+	nonce := bc.ProofOfWork()
+	previousHash := bc.LastBlock().Hash()
+	bc.CreateBlock(nonce, previousHash)
+	log.Println("action=mining", "status=success")
+
+	return true
+}
+
 //Transactionを定義
 type Transaction struct {
 	senderBlockchainAddress    string
@@ -163,20 +180,18 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 }
 
 func main() {
-	blockchain := NewBlockchain()
+	myBlockchainAddress := "my_blockchain_address"
+	blockchain := NewBlockchain(myBlockchainAddress)
 	blockchain.Print()
 
 	//chainの最後にハッシュを追加するために、ハッシュを生成する
-	previousHash := blockchain.LastBlock().Hash()
-	nonce := blockchain.ProofOfWork()
-	blockchain.CreateBlock(nonce, previousHash)
+	blockchain.AddTransaction("A", "B", 1.0)
+	blockchain.Mining()
 	blockchain.Print()
 
 	blockchain.AddTransaction("C", "D", 2.0)
 	blockchain.AddTransaction("X", "Y", 3.0)
 
-	previousHash = blockchain.LastBlock().Hash()
-	nonce = blockchain.ProofOfWork()
-	blockchain.CreateBlock(2, previousHash)
+	blockchain.Mining()
 	blockchain.Print()
 }
